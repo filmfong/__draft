@@ -1,0 +1,20 @@
+lefse_format_input.py lefse_lv6_F1toF14_v1.txt lefse_lv6_F1toF14_v1.in -c 2 -u 1 -s -1 -o 1000000
+lefse_run.py lefse_lv6_F1toF14_v1.in LDA_lv6_F1toF14_v1.res
+lefse_plot_res.py LDA_lv6_F1toF14_v1.res LDA_ploted_lv6_F1toF14_v1.png --format png --dpi 1200
+lefse_plot_cladogram.py LDA_lv6_F1toF14_v1.res LDA_ploted_lv6_F1toF14_v1.cladogram.png --format png --dpi 1200
+
+lefse_format_input.py lefse_lv6_F1toF14_v2.txt lefse_lv6_F1toF14_v2.in -c 2 -u 1 -s -1 -o 1000000
+lefse_run.py lefse_lv6_F1toF14_v2.in LDA_lv6_F1toF14_v2.res
+lefse_plot_res.py LDA_lv6_F1toF14_v2.res LDA_ploted_lv6_F1toF14_v2.png --format png --dpi 1200 --autoscale 0 --left_space 0 --right_space 0 --orientation v
+lefse_plot_cladogram.py LDA_lv6_F1toF14_v2.res LDA_ploted_lv6_F1toF14_v2.cladogram.png --format png --dpi 1200
+
+lefse_plot_res.py LDA_lv6_F1toF14_v2.res LDA_ploted_lv6_F1toF14_v2_otu_only.png --format png --dpi 1200 --otu_only
+
+lefse_format_input.py lefse_lv6_F1toF14_trimed.txt lefse_lv6_F1toF14_trimed.in -c 2 -u 1 -s -1 -o 1000000
+lefse_run.py lefse_lv6_F1toF14_trimed.in LDA_lv6_F1toF14_trimed.res
+lefse_plot_res.py LDA_lv6_F1toF14_trimed.res LDA_ploted_lv6_F1toF14_trimed.png --format png --dpi 1200
+lefse_plot_cladogram.py LDA_lv6_F1toF14_trimed.res LDA_ploted_lv6_F1toF14_trimed.cladogram.png --format png --dpi 1200
+
+lefse_format_input.py lefse_lv6_F1toF14_trimed_v2.txt lefse_lv6_F1toF14_trimed_v2.in -c 2 -u 1 -s -1 -o 1000000
+lefse_run.py lefse_lv6_F1toF14_trimed_v2.in LDA_lv6_F1toF14_trimed_v2.res
+lefse_plot_res.py LDA_lv6_F1toF14_trimed_v2.res LDA_ploted_lv6_F1toF14_trimed_v2.png --format png --dpi 1200
