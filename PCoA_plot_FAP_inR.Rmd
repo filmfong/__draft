@@ -1,0 +1,30 @@
+---
+title: "R_plot FAP"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(qiime2R)
+library(ggVennDiagram)
+library(ggplot2)
+
+PC_FAP <- read_qza("C:/Users/Admin/OneDrive/Desktop/FAP/PCoA/unweighted_unifrac_pcoa_results.qza")
+metadata_FAP <- read.table("C:/Users/Admin/OneDrive/Desktop/FAP/PCoA/sample-metadata.tsv",T)
+
+```
+
+```{r}
+PCoA_FAP <- left_join(metadata_FAP, PC_FAP$data$Vectors, by=c('ID'='SampleID'))
+Type <- metadata_FAP$TISSUE
+```
+
+```{r}
+x_FAP <- PCoA_FAP$PC1
+y_FAP <- PCoA_FAP$PC2
+ggplot(PCoA_FAP, aes(x=x_FAP, y=y_FAP, color = Type)) + geom_point(size=3) + 
+  stat_ellipse(geom = "polygon", alpha = 0.25, aes(fill=Type)) + xlab("PC1 (26.73%)") + ylab("PC2 (12.38%)") + ggtitle("PCoA with 95% confidence polygons") +  theme(text = element_text(size = 12)) + theme_bw() + scale_color_grey() + scale_fill_grey()
+ggsave("C:/Users/Admin/OneDrive/Desktop/FAP/PCoA_FAP_gray.pdf", height=8, width=10, device="pdf")
+
+```
+
