@@ -1,0 +1,48 @@
+---
+title: "Rplot_HNPCC"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(qiime2R)
+library(ggVennDiagram)
+library(ggplot2)
+
+PC <- read_qza("C:/Users/Admin/OneDrive/Desktop/HNPCC/PCoA/unweighted_unifrac_pcoa_results.qza")
+metadata <- read.table("C:/Users/Admin/OneDrive/Desktop/HNPCC/PCoA/Metadata.tsv",T)
+observed_species <- read_qza("C:/Users/Admin/OneDrive/Desktop/HNPCC/AlphaDiversity/observed_features_vector.qza")
+
+```
+
+```{r}
+observed_species <- observed_species$data %>% rownames_to_column("sample.id")
+```
+
+```{r}
+x <- list(metadata=metadata$sample.id, observed_species=observed_species$sample.id)
+ggVennDiagram(x)
+```
+
+```{r}
+metadata <- metadata %>% left_join(observed_species)
+head(metadata)
+```
+
+```{r}
+metadata <- left_join(metadata, PC$data$Vectors, by=c('sample.id'='SampleID'))
+PCoA <- left_join(metadata, PC$data$Vectors, by=c('sample.id'='SampleID'))
+Stage <- metadata$Stage
+```
+
+
+```{r}
+PCoA <- left_join(metadata, PC$data$Vectors, by=c('sample.id'='SampleID'))
+x <- PCoA$PC1
+y <- PCoA$PC2
+ggplot(PCoA, aes(x=x, y=y, color = Stage)) + geom_point(size=3) + 
+  stat_ellipse(geom = "polygon", alpha = 0.25, aes(fill=Stage)) + xlab("PC1 (14.85%)") + ylab("PC2 (10.51%)") + ggtitle("PCoA with 95% confidence polygons") +  theme_q2r() + theme(text = element_text(size = 12, ))
+ggsave("C:/Users/Admin/OneDrive/Desktop/HNPCC/PCoA/PCoA.pdf", height=8, width=10, device="pdf")
+
+```
+
