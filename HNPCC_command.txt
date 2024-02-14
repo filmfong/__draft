@@ -1,0 +1,394 @@
+##### Linux htop command to check running process in Linux #####
+
+
+CREATE MENIFEST FILE (already demultiplex)
+########## ls for sample id
+ls *_1.fastq.gz > manifest.txt
+########## replace _1.fastq.gz with blank
+
+########## ls with path
+ls -d $PWD/*_1* > path1.txt
+ls -d $PWD/*_2* > path2.txt
+
+
+########## import PE
+qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path manifest.txt \
+  --output-path demux.qza \
+  --input-format PairedEndFastqManifestPhred33V2
+
+
+########## cut adapter #############
+qiime cutadapt trim-paired \
+--i-demultiplexed-sequences demux.qza \
+--p-adapter-f ATTAGAWACCCBDGTAGTCC \
+--p-front-f CCTACGGGAGGCAGCAG \
+--p-adapter-r CTGCTGCCTCCCGTAGG \
+--p-front-r GGACTACHVGGGTWTCTAAT \
+--p-discard-untrimmed \
+--p-times 2 \
+--p-cores 100 \
+--o-trimmed-sequences demux_cutadapt.qza \
+--verbose > trimming_report.log
+
+
+########## view demux.qza ########## quality score>25
+qiime demux summarize \
+  --i-data demux.qza \
+  --o-visualization demux.qzv
+qiime demux summarize \
+  --i-data demux_cutadapt.qza \
+  --o-visualization demux_cutadapt.qzv
+
+
+########## denoise 
+qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs demux.qza \
+  --p-trim-left-f 0 \
+  --p-trim-left-r 0 \
+  --p-trunc-len-f 280 \
+  --p-trunc-len-r 220 \
+  --p-n-threads 2 \
+  --o-table table.qza \
+  --o-representative-sequences rep-seqs.qza \
+  --o-denoising-stats denoising-stats.qza
+
+qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs demux_cutadapt.qza \
+  --p-trim-left-f 0 \
+  --p-trim-left-r 0 \
+  --p-trunc-len-f 260 \
+  --p-trunc-len-r 200 \
+  --p-n-threads 100 \
+  --o-table table-cutadapt.qza \
+  --o-representative-sequences rep-seqs-cutadapt.qza \
+  --o-denoising-stats denoising-stats-cutadapt.qza
+
+
+########## HNPCC grouping samples
+qiime feature-table group \
+--i-table table-cutadapt.qza \
+--p-axis sample \
+--m-metadata-file Metadata.txt \
+--m-metadata-column Stage \
+--p-mode mean-ceiling \
+--o-grouped-table mean-grouped-table-cutadapt.qza
+
+qiime feature-table group \
+--i-table table-cutadapt.qza \
+--p-axis sample \
+--m-metadata-file Metadata.txt \
+--m-metadata-column Stage \
+--p-mode sum \
+--o-grouped-table sum-grouped-table-cutadapt.qza
+
+qiime feature-table group \
+--i-table table-cutadapt.qza \
+--p-axis sample \
+--m-metadata-file Metadata.txt \
+--m-metadata-column Stage \
+--p-mode median-ceiling \
+--o-grouped-table median-grouped-table-cutadapt.qza
+
+########## visualizations
+qiime feature-table summarize \
+  --i-table grouped-table-cutadapt.qza \
+  --o-visualization mean-grouped-table-cutadapt.qzv
+
+qiime feature-table summarize \
+  --i-table median-grouped-table-cutadapt.qza \
+  --o-visualization median-grouped-table-cutadapt.qzv
+
+qiime feature-table summarize \
+  --i-table sum-grouped-table-cutadapt.qza \
+  --o-visualization sum-grouped-table-cutadapt.qzv
+
+qiime feature-table summarize \
+  --i-table table-cutadapt.qza \
+  --o-visualization table-cutadapt.qzv \
+  --m-sample-metadata-file Metadata.txt
+qiime feature-table summarize \
+  --i-table table.qza \
+  --o-visualization table.qzv \
+  --m-sample-metadata-file Metadata.txt
+
+qiime feature-table tabulate-seqs \
+  --i-data rep-seqs-cutadapt.qza \
+  --o-visualization rep-seqs-cutadapt.qzv
+
+qiime metadata tabulate \
+  --m-input-file denoising-stats.qza \
+  --o-visualization denoising-stats.qzv
+
+########## taxonomic assign (Greengenes)
+qiime feature-classifier classify-sklearn \
+  --i-classifier gg-13-8-99-nb-classifier.qza \
+  --i-reads rep-seqs-cutadapt.qza \
+  --o-classification gg-taxonomy-cutadapt.qza
+
+qiime taxa barplot \
+  --i-table table.qza \
+  --i-taxonomy gg-taxonomy.qza \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization gg-taxa-bar-plots.qzv
+
+########## taxonomic assign (silva)
+qiime feature-classifier classify-sklearn \
+  --i-classifier silva-138-99-nb-classifier.qza \
+  --i-reads rep-seqs-cutadapt.qza \
+  --o-classification taxonomy-cutadapt.qza
+
+qiime metadata tabulate \
+  --m-input-file taxonomy-cutadapt.qza \
+  --o-visualization taxonomy-cutadapt.qzv
+
+qiime taxa barplot \
+  --i-table table-cutadapt.qza \
+  --i-taxonomy taxonomy-cutadapt.qza \
+  --m-metadata-file Metadata.txt \
+  --o-visualization taxa-bar-plots-cutadapt.qzv
+
+########### 
+qiime taxa barplot \
+  --i-table grouped-table-cutadapt.qza \
+  --i-taxonomy taxonomy-cutadapt.qza \
+  --o-visualization mean-grouped-taxa-bar-plots-cutadapt.qzv
+
+qiime taxa barplot \
+  --i-table sum-grouped-table-cutadapt.qza \
+  --i-taxonomy taxonomy-cutadapt.qza \
+  --o-visualization sum-grouped-taxa-bar-plots-cutadapt.qzv
+
+qiime taxa barplot \
+  --i-table median-grouped-table-cutadapt.qza \
+  --i-taxonomy taxonomy-cutadapt.qza \
+  --o-visualization median-grouped-taxa-bar-plots-cutadapt.qzv
+
+
+###########FAP-table
+qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file sample-metadata.txt \
+  --p-where "[TYPE]='FAP'" \
+  --o-filtered-table FAP-table.qza
+###########FAP-ANCOM lv2
+qiime taxa collapse \
+  --i-table FAP-table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-level 2 \
+  --o-collapsed-table FAP-table-lv2.qza
+
+qiime composition add-pseudocount \
+  --i-table FAP-table-lv2.qza \
+  --o-composition-table comp-FAP-table-lv2.qza
+
+qiime composition ancom \
+  --i-table comp-FAP-table-lv2.qza \
+  --m-metadata-file sample-metadata.txt \
+  --m-metadata-column TISSUE \
+  --o-visualization lv2-ancom-TISSUE.qzv
+
+###########FAP-ANCOM lv6
+qiime taxa collapse \
+  --i-table FAP-table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-level 6 \
+  --o-collapsed-table FAP-table-lv6.qza
+
+qiime composition add-pseudocount \
+  --i-table FAP-table-lv6.qza \
+  --o-composition-table comp-FAP-table-lv6.qza
+
+qiime composition ancom \
+  --i-table comp-FAP-table-lv6.qza \
+  --m-metadata-file sample-metadata.txt \
+  --m-metadata-column TISSUE \
+  --o-visualization lv6-ancom-TISSUE.qzv
+
+###########HNPCC-table
+qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file Metadata.txt \
+  --p-where "[Type]='HNPCC'" \
+  --o-filtered-table HNPCC-table.qza
+###########HNPCC-ANCOM lv2
+qiime taxa collapse \
+  --i-table HNPCC-table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-level 2 \
+  --o-collapsed-table HNPCC-table-lv2.qza
+
+qiime composition add-pseudocount \
+  --i-table HNPCC-table-lv2.qza \
+  --o-composition-table comp-HNPCC-table-lv2.qza
+
+qiime composition ancom \
+  --i-table comp-HNPCC-table-lv2.qza \
+  --m-metadata-file Metadata.txt \
+  --m-metadata-column Stage \
+  --o-visualization lv2-ancom-Stage.qzv
+
+###########HNPCC-ANCOM lv6
+qiime taxa collapse \
+  --i-table HNPCC-table.qza \
+  --i-taxonomy taxonomy.qza \
+  --p-level 6 \
+  --o-collapsed-table HNPCC-table-lv6.qza
+
+qiime composition add-pseudocount \
+  --i-table HNPCC-table-lv6.qza \
+  --o-composition-table comp-HNPCC-table-lv6.qza
+
+qiime composition ancom \
+  --i-table comp-HNPCC-table-lv6.qza \
+  --m-metadata-file Metadata.txt \
+  --m-metadata-column Stage \
+  --o-visualization lv6-ancom-Stage.qzv
+
+_______________________________________________________________________
+########## Generate tree ################
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences rep-seqs.qza \
+  --output-dir phylogeny-align-to-tree-mafft-fasttree
+
+########## diversity core-metrics-phylogenetic
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree/rooted_tree.qza \
+  --i-table table.qza \
+  --p-sampling-depth 9811 \
+  --m-metadata-file sample-metadata.txt \
+  --output-dir diversity-core-metrics-phylogenetic
+
+########## Alpha rarefaction plotting
+qiime diversity alpha-rarefaction \
+  --i-table table.qza \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree/rooted_tree.qza \
+  --p-max-depth 16602 \
+  --p-metrics observed_features,chao1,shannon,simpson,goods_coverage \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization max-alpha-rarefaction.qzv
+qiime diversity alpha-rarefaction \
+  --i-table table.qza \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree/rooted_tree.qza \
+  --p-max-depth 9811 \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization alpha-rarefaction.qzv
+
+qiime diversity alpha-rarefaction \
+  --i-table median-grouped-table.qza \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree/rooted_tree.qza \
+  --p-max-depth 6271 \
+  --o-visualization median-grouped-alpha-rarefaction.qzv
+
+########### Alpha diversity
+qiime diversity alpha-phylogenetic \
+  --i-table table.qza \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree/rooted_tree.qza \
+  --p-metric faith_pd \
+  --o-alpha-diversity diversity/faith_pd_vector.qza
+qiime diversity alpha \
+  --i-table table.qza \
+  --p-metric chao1 \
+  --o-alpha-diversity diversity/chao1_vector.qza
+qiime diversity alpha \
+  --i-table table.qza \
+  --p-metric goods_coverage \
+  --o-alpha-diversity diversity/goods_coverage_vector.qza
+qiime diversity alpha \
+  --i-table table.qza \
+  --p-metric shannon \
+  --o-alpha-diversity diversity/shannon_vector.qza
+qiime diversity alpha \
+  --i-table table.qza \
+  --p-metric simpson \
+  --o-alpha-diversity diversity/simpson_vector.qza
+qiime diversity alpha \
+  --i-table table.qza \
+  --p-metric observed_features \
+  --o-alpha-diversity diversity/observed_features_vector.qza
+
+########### Alpha diversity comparisons
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity/faith_pd_vector.qza \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization diversity/faith_pd_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity/chao1_vector.qza \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization diversity/chao1_group_significance.qzv
+qiime diversity alpha-group-significance  \
+  --i-alpha-diversity diversity/goods_coverage_vector.qza \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization diversity/goods_coverage_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity/shannon_vector.qza \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization diversity/shannon_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity/simpson_vector.qza \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization diversity/simpson_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity/observed_features_vector.qza \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization diversity/observed_features_group_significance.qzv
+
+################ Alpha rarefaction curves
+qiime diversity alpha-rarefaction \
+  --i-table table.qza \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree/rooted_tree.qza \
+  --p-max-depth 16602 \
+  --p-metrics observed_features \
+  --p-metrics chao1 \
+  --p-metrics shannon \
+  --p-metrics simpson \
+  --p-metrics goods_coverage \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization max-alpha-rarefaction.qzv
+
+############## PCoA
+qiime emperor plot \
+  --i-pcoa diversity-core-metrics-phylogenetic/unweighted_unifrac_pcoa_results.qza \
+  --m-metadata-file sample-metadata.txt \
+  --o-visualization unweighted-unifrac-emperor.qzv
+
+
+############### Vector to qzv ###############
+qiime metadata tabulate \
+  --m-input-file faith_pd_vector.qza \
+  --o-visualization tabulated-faith-pd-metadata.qzv
+qiime metadata tabulate \
+  --m-input-file chao1_vector.qza \
+  --o-visualization tabulated-chao1-metadata.qzv
+qiime metadata tabulate \
+  --m-input-file goods_coverage_vector.qza \
+  --o-visualization tabulated-goods-coverage-metadata.qzv
+qiime metadata tabulate \
+  --m-input-file observed_features_vector.qza \
+  --o-visualization tabulated-observed-features-metadata.qzv
+qiime metadata tabulate \
+  --m-input-file shannon_vector.qza \
+  --o-visualization tabulated-shannon-metadata.qzv
+qiime metadata tabulate \
+  --m-input-file simpson_vector.qza \
+  --o-visualization tabulated-simpson-metadata.qzv
+
+############### combined metadata ##########
+qiime metadata tabulate \
+  --m-input-file sample-metadata.txt \
+  --m-input-file faith_pd_vector.qza \
+  --o-visualization tabulated-combined-metadata.qzv
+qiime metadata tabulate \
+  --m-input-file tabulated-combined-metadata.qzv \
+  --m-input-file chao1_vector.qza \
+  --o-visualization tabulated-combined-metadata2.qzv
+
+
+
+
+
+
+
+
+

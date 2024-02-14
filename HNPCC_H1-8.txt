@@ -1,0 +1,144 @@
+manifest_H1_8.txt
+
+
+qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path manifest_H1_8.txt \
+  --output-path demux_H1to8.qza \
+  --input-format PairedEndFastqManifestPhred33V2
+
+
+qiime cutadapt trim-paired \
+--i-demultiplexed-sequences demux_H1to8.qza \
+--p-adapter-f ATTAGAWACCCBDGTAGTCC \
+--p-front-f CCTACGGGAGGCAGCAG \
+--p-adapter-r CTGCTGCCTCCCGTAGG \
+--p-front-r GGACTACHVGGGTWTCTAAT \
+--p-discard-untrimmed \
+--p-times 2 \
+--p-cores 100 \
+--o-trimmed-sequences demux_H1to8_cutadapt.qza \
+--verbose > trimming_report.log
+
+
+########## view demux.qza ########## quality score>25
+qiime demux summarize \
+  --i-data demux_H1to8_cutadapt.qza \
+  --o-visualization demux_H1to8_cutadapt.qzv
+
+qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs demux_H1to8_cutadapt.qza \
+  --p-trim-left-f 0 \
+  --p-trim-left-r 0 \
+  --p-trunc-len-f 260 \
+  --p-trunc-len-r 200 \
+  --p-n-threads 100 \
+  --o-table table_H1to8-cutadapt.qza \
+  --o-representative-sequences rep-seqs_H1to8-cutadapt.qza \
+  --o-denoising-stats denoising-stats_H1to8-cutadapt.qza
+
+
+
+qiime feature-table group \
+--i-table table_H1to8-cutadapt.qza \
+--p-axis sample \
+--m-metadata-file Metadata.txt \
+--m-metadata-column Stage \
+--p-mode mean-ceiling \
+--o-grouped-table mean-grouped-table_H1to8-cutadapt.qza
+
+
+qiime feature-table summarize \
+  --i-table mean-grouped-table_H1to8-cutadapt.qza \
+  --o-visualization mean-grouped-table_H1to8-cutadapt.qzv
+qiime feature-table summarize \
+  --i-table table_H1to8-cutadapt.qza \
+  --o-visualization table_H1to8-cutadapt.qzv \
+  --m-sample-metadata-file Metadata.txt
+
+qiime feature-classifier classify-sklearn \
+  --i-classifier silva-138-99-nb-classifier.qza \
+  --i-reads rep-seqs_H1to8-cutadapt.qza \
+  --o-classification taxonomy_H1to8-cutadapt.qza
+
+qiime taxa barplot \
+  --i-table mean-grouped-table_H1to8-cutadapt.qza \
+  --i-taxonomy taxonomy_H1to8-cutadapt.qza \
+  --o-visualization mean-grouped-taxa-bar-plots_H1to8-cutadapt.qzv
+qiime taxa barplot \
+  --i-table table_H1to8-cutadapt.qza \
+  --i-taxonomy taxonomy_H1to8-cutadapt.qza \
+  --m-metadata-file Metadata.txt \
+  --o-visualization taxa-bar-plots_H1to8-cutadapt.qzv
+
+_______________________________________________________________________
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences rep-seqs_H1to8-cutadapt.qza \
+  --output-dir phylogeny-align-to-tree-mafft-fasttree_H1to8
+
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree_H1to8/rooted_tree.qza \
+  --i-table table_H1to8-cutadapt.qza \
+  --p-sampling-depth 34316 \
+  --m-metadata-file Metadata.txt \
+  --output-dir diversity-core-metrics-phylogenetic_H1to8
+
+########### Alpha diversity
+qiime diversity alpha-phylogenetic \
+  --i-table table_H1to8-cutadapt.qza \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree_H1to8/rooted_tree.qza \
+  --p-metric faith_pd \
+  --o-alpha-diversity diversity_H1to8/faith_pd_vector.qza
+qiime diversity alpha \
+  --i-table table_H1to8-cutadapt.qza \
+  --p-metric chao1 \
+  --o-alpha-diversity diversity_H1to8/chao1_vector.qza
+qiime diversity alpha \
+  --i-table table_H1to8-cutadapt.qza \
+  --p-metric goods_coverage \
+  --o-alpha-diversity diversity_H1to8/goods_coverage_vector.qza
+qiime diversity alpha \
+  --i-table table_H1to8-cutadapt.qza \
+  --p-metric shannon \
+  --o-alpha-diversity diversity_H1to8/shannon_vector.qza
+qiime diversity alpha \
+  --i-table table_H1to8-cutadapt.qza \
+  --p-metric simpson \
+  --o-alpha-diversity diversity_H1to8/simpson_vector.qza
+qiime diversity alpha \
+  --i-table table_H1to8-cutadapt.qza \
+  --p-metric observed_features \
+  --o-alpha-diversity diversity_H1to8/observed_features_vector.qza
+
+########### Alpha diversity comparisons
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_H1to8/faith_pd_vector.qza \
+  --m-metadata-file Metadata.txt \
+  --o-visualization diversity_H1to8/faith_pd_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_H1to8/chao1_vector.qza \
+  --m-metadata-file Metadata.txt \
+  --o-visualization diversity_H1to8/chao1_group_significance.qzv
+qiime diversity alpha-group-significance  \
+  --i-alpha-diversity diversity_H1to8/goods_coverage_vector.qza \
+  --m-metadata-file Metadata.txt \
+  --o-visualization diversity_H1to8/goods_coverage_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_H1to8/shannon_vector.qza \
+  --m-metadata-file Metadata.txt \
+  --o-visualization diversity_H1to8/shannon_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_H1to8/simpson_vector.qza \
+  --m-metadata-file Metadata.txt \
+  --o-visualization diversity_H1to8/simpson_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_H1to8/observed_features_vector.qza \
+  --m-metadata-file Metadata.txt \
+  --o-visualization diversity_H1to8/observed_features_group_significance.qzv
+
+############## PCoA
+qiime emperor plot \
+  --i-pcoa diversity-core-metrics-phylogenetic_H1to8/unweighted_unifrac_pcoa_results.qza \
+  --m-metadata-file Metadata.txt \
+  --o-visualization diversity-core-metrics-phylogenetic_H1to8/unweighted-unifrac-emperor.qzv
+

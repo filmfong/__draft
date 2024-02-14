@@ -1,0 +1,162 @@
+CREATE MENIFEST FILE (already demultiplex)
+########## ls for sample id
+ls *_1.fastq.gz > manifest_F1toF14.txt
+########## replace _1.fastq.gz with blank
+
+########## ls with path
+ls -d $PWD/*_1* > path1.txt
+ls -d $PWD/*_2* > path2.txt
+
+
+########## import PE
+qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path manifest_F1toF14.txt \
+  --output-path demux_F1toF14.qza \
+  --input-format PairedEndFastqManifestPhred33V2
+
+
+########## cut adapter #############
+qiime cutadapt trim-paired \
+--i-demultiplexed-sequences demux_F1toF14.qza \
+--p-adapter-f ATTAGAWACCCBDGTAGTCC \
+--p-front-f CCTACGGGAGGCAGCAG \
+--p-adapter-r CTGCTGCCTCCCGTAGG \
+--p-front-r GGACTACHVGGGTWTCTAAT \
+--p-discard-untrimmed \
+--p-times 2 \
+--p-cores 100 \
+--o-trimmed-sequences demux_cutadapt_F1toF14.qza \
+--verbose > trimming_report.log
+
+########## view demux.qza ########## quality score>25
+qiime demux summarize \
+  --i-data demux_cutadapt_F1toF14.qza \
+  --o-visualization demux_cutadapt_F1toF14.qzv
+
+
+########## denoise 
+qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs demux_cutadapt_F1toF14.qza \
+  --p-trim-left-f 0 \
+  --p-trim-left-r 0 \
+  --p-trunc-len-f 260 \
+  --p-trunc-len-r 200 \
+  --p-n-threads 2 \
+  --o-table table-cutadapt_F1toF14.qza \
+  --o-representative-sequences rep-seqs-cutadapt_F1toF14.qza \
+  --o-denoising-stats denoising-stats-cutadapt_F1toF14.qza
+
+qiime feature-table group \
+--i-table table-cutadapt_F1toF14.qza \
+--p-axis sample \
+--m-metadata-file sample-metadata.txt \
+--m-metadata-column TISSUE \
+--p-mode mean-ceiling \
+--o-grouped-table mean-grouped-table-cutadapt_F1toF14.qza
+
+########## visualizations
+qiime feature-table summarize \
+  --i-table mean-grouped-table-cutadapt_F1toF14.qza \
+  --o-visualization mean-grouped-table-cutadapt_F1toF14.qzv
+qiime feature-table summarize \
+  --i-table table-cutadapt_F1toF14.qza \
+  --o-visualization table-cutadapt_F1toF14.qzv \
+  --m-sample-metadata-file sample-metadata_F1toF14.txt
+
+
+########## taxonomic assign (silva)
+qiime feature-classifier classify-sklearn \
+  --i-classifier silva-138-99-nb-classifier.qza \
+  --i-reads rep-seqs-cutadapt_F1toF14.qza \
+  --o-classification taxonomy-cutadapt_F1toF14.qza
+
+qiime taxa barplot \
+  --i-table table-cutadapt_F1toF14.qza \
+  --i-taxonomy taxonomy-cutadapt_F1toF14.qza \
+  --m-metadata-file sample-metadata_F1toF14.txt \
+  --o-visualization taxa-bar-plots-cutadapt_F1toF14.qzv
+
+qiime taxa barplot \
+  --i-table mean-grouped-table-cutadapt_F1toF14.qza \
+  --i-taxonomy taxonomy-cutadapt_F1toF14.qza \
+  --o-visualization mean-grouped-taxa-bar-plots-cutadapt_F1toF14.qzv
+_______________________________________________________________________
+########## Generate tree ################
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences rep-seqs-cutadapt_F1toF14.qza \
+  --output-dir phylogeny-align-to-tree-mafft-fasttree_F1toF14
+
+########## diversity core-metrics-phylogenetic
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree_F1toF14/rooted_tree.qza \
+  --i-table table-cutadapt_F1toF14.qza \
+  --p-sampling-depth 23533 \
+  --m-metadata-file sample-metadata_F1toF14.txt \
+  --output-dir diversity-core-metrics-phylogenetic_F1toF14
+
+
+mkdir diversity_F1toF14
+
+qiime diversity alpha-phylogenetic \
+  --i-table table-cutadapt_F1toF14.qza \
+  --i-phylogeny phylogeny-align-to-tree-mafft-fasttree_F1toF14/rooted_tree.qza \
+  --p-metric faith_pd \
+  --o-alpha-diversity diversity_F1toF14/faith_pd_vector.qza
+qiime diversity alpha \
+  --i-table table-cutadapt_F1toF14.qza \
+  --p-metric chao1 \
+  --o-alpha-diversity diversity_F1toF14/chao1_vector.qza
+qiime diversity alpha \
+  --i-table table-cutadapt_F1toF14.qza \
+  --p-metric goods_coverage \
+  --o-alpha-diversity diversity_F1toF14/goods_coverage_vector.qza
+qiime diversity alpha \
+  --i-table table-cutadapt_F1toF14.qza \
+  --p-metric shannon \
+  --o-alpha-diversity diversity_F1toF14/shannon_vector.qza
+qiime diversity alpha \
+  --i-table table-cutadapt_F1toF14.qza \
+  --p-metric simpson \
+  --o-alpha-diversity diversity_F1toF14/simpson_vector.qza
+qiime diversity alpha \
+  --i-table table-cutadapt_F1toF14.qza \
+  --p-metric observed_features \
+  --o-alpha-diversity diversity_F1toF14/observed_features_vector.qza
+
+########### Alpha diversity comparisons
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_F1toF14/faith_pd_vector.qza \
+  --m-metadata-file sample-metadata_F1toF14.txt \
+  --o-visualization diversity_F1toF14/faith_pd_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_F1toF14/chao1_vector.qza \
+  --m-metadata-file sample-metadata_F1toF14.txt \
+  --o-visualization diversity_F1toF14/chao1_group_significance.qzv
+qiime diversity alpha-group-significance  \
+  --i-alpha-diversity diversity_F1toF14/goods_coverage_vector.qza \
+  --m-metadata-file sample-metadata_F1toF14.txt \
+  --o-visualization diversity_F1toF14/goods_coverage_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_F1toF14/shannon_vector.qza \
+  --m-metadata-file sample-metadata_F1toF14.txt \
+  --o-visualization diversity_F1toF14/shannon_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_F1toF14/simpson_vector.qza \
+  --m-metadata-file sample-metadata_F1toF14.txt \
+  --o-visualization diversity_F1toF14/simpson_group_significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity diversity_F1toF14/observed_features_vector.qza \
+  --m-metadata-file sample-metadata_F1toF14.txt \
+  --o-visualization diversity_F1toF14/observed_features_group_significance.qzv
+
+
+############## PCoA
+qiime emperor plot \
+  --i-pcoa diversity-core-metrics-phylogenetic_F1toF14/unweighted_unifrac_pcoa_results.qza \
+  --m-metadata-file sample-metadata_F1toF14.txt \
+  --o-visualization unweighted-unifrac-emperor_F1toF14.qzv
+
+
+
+
